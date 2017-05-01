@@ -5,6 +5,9 @@ dictentry _WORD, "WORD"
 
 restart:
         mov esi, [TIB]
+        or esi, esi    ; if no source for input buffer
+        jz getline
+
         mov edi, PAD
 
 nextchar:
@@ -35,13 +38,15 @@ gotspace:
         pop esi
         NEXT
 
+; should become REFILL ( -- flag ) at some point
 getline:
         push 128
-        push TIB
+        push TIBUF
         push 0   ; stdin
         call read
         add esp, 12
-        mov ebx, eax
+        mov byte [eax+TIBUF-1], 0   ; replace \n with NUL
+        mov dword [TIB], TIBUF
         jmp restart
 
 dictentry FIND, "FIND"  ; ( str -- str|xt 0|1|-1 )
