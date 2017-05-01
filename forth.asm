@@ -5,6 +5,8 @@ bits 32
 global main
 extern atoi, printf, read
 
+%define latest_tok 0  ; tail of dictionary linked list
+
 %macro NEXT 0
         lodsd       ; fetch next xt from PC
         jmp eax     ; direct threading
@@ -20,17 +22,16 @@ extern atoi, printf, read
         add ebp, 4
 %endmacro
 
-%define latest_tok 0  ; tail of dictionary linked list
-
-%macro dictentry 1
+; dictentry STAR, "*"
+%macro dictentry 2
        align 16, db 0
 nt_%1  dd latest_tok
 %define latest_tok nt_%1
-%defstr name %1
-       db name
+       db %2
        align 16, db 0
 %1:
 %endmacro
+
 
 main:
         sub esp, 0x40     ; esp = data stack, grows down
@@ -69,111 +70,30 @@ QBRANCH:
         add esi, eax
 QB1:    NEXT
 
-DUP:    push ebx
+dictentry DUP, "DUP"
+        push ebx
         NEXT
 
-STAR:   pop eax
+dictentry STAR, "*"
+        pop eax
         imul ebx
         mov ebx, eax
         NEXT
 
-
-dictentry BYE
+dictentry BYE, "BYE"
         mov eax, 1         ; eax = syscall 1 (exit)
         int 0x80           ; ebx = exit code (conveniently also TOS)
 
-TONUM:
+dictentry TONUM, ">NUMBER"
         push ebx
         call atoi
         add esp, 4
         mov ebx, eax
         NEXT
 
-_WORD:
-        push esi
-        push edi
+%include "interpret.asm"
 
-restart:
-        mov esi, [TIB]
-        mov edi, PAD
-
-nextchar:
-        lodsb
-        cmp al, bl
-        jz gotspace
-        or al, al
-        jz gotzero
-
-        stosb
-        jmp nextchar
-
-gotzero:               ; end of string:
-        cmp edi, PAD   ; if no characters stored yet
-        jz getline     ; get line of input from user
-
-gotspace:
-        cmp edi, PAD   ; if leading spaces
-        jz nextchar    ; just continue
-        mov al, 0
-        stosb          ; store terminating NUL
-
-        mov [TIB], esi
-
-        mov ebx, PAD   ; returned word always at start of PAD
-
-        pop edi
-        pop esi
-        NEXT
-
-getline:
-        push 128
-        push TIB
-        push 0   ; stdin
-        call read
-        add esp, 12
-        mov ebx, eax
-        jmp restart
-
-FIND:   ; ( str -- str|xt 0|1|-1 )
-        push esi
-        push edi
-
-        mov edi, ebx      ; given string pointer
-        mov ecx, 128
-        mov al, 0
-        repnz scasb       ;
-        mov eax, edi
-        sub eax, ebx      ; put strlen in eax
-
-        mov edx, [LATEST]
-
-nextword:
-        lea esi, [edx+4]  ; dict name
-        mov edi, ebx      ; esi = str
-        mov ecx, eax      ; eax = strlen(str)
-        repz cmpsb
-        jz found
-        mov edx, [edx]
-        or edx, edx       ;  link != 0 (more dictionary entries)
-        jnz nextword
-
-notfound:
-        pop edi
-        pop esi
-
-        push ebx
-        xor ebx, ebx
-        NEXT
-found:
-        pop edi
-        pop esi
-
-        add edx, 16       ; get xt from nt
-        push edx
-        mov ebx, 1
-        NEXT
-
-dictentry SQUARED
+dictentry SQUARED, "SQUARED"
         call ENTER
         dd DUP, STAR, EXIT
 
@@ -183,7 +103,8 @@ INTERPRET: call ENTER
 
 START   dd INTERPRET, BRANCH, -12
 
-TIBUF   db "10 SQUARED BYE", 0
+TIBUF   db ": SQUARED DUP * ; "
+        db "10 SQUARED BYE", 0
 
 section .data
 TIB     dd TIBUF
