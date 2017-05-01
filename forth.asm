@@ -20,6 +20,18 @@ extern atoi, printf, read
         add ebp, 4
 %endmacro
 
+%define latest_tok 0  ; tail of dictionary linked list
+
+%macro dictentry 1
+       align 16, db 0
+nt_%1  dd latest_tok
+%define latest_tok nt_%1
+%defstr name %1
+       db name
+       align 16, db 0
+%1:
+%endmacro
+
 main:
         sub esp, 0x40     ; esp = data stack, grows down
         lea ebp, [esp+4]  ; ebp = return stack, grows up
@@ -65,11 +77,9 @@ STAR:   pop eax
         mov ebx, eax
         NEXT
 
-           align 16, db 0
-ntBYE   dd 0
-        db 'BYE'
-        align 16, db 0
-BYE:    mov eax, 1         ; eax = syscall 1 (exit)
+
+dictentry BYE
+        mov eax, 1         ; eax = syscall 1 (exit)
         int 0x80           ; ebx = exit code (conveniently also TOS)
 
 TONUM:
@@ -163,12 +173,9 @@ found:
         mov ebx, 1
         NEXT
 
-           align 16, db 0
-ntSQUARED  dd ntBYE
-           db 'SQUARED'
-           align 16, db 0
-SQUARED: call ENTER
-         dd DUP, STAR, EXIT
+dictentry SQUARED
+        call ENTER
+        dd DUP, STAR, EXIT
 
 INTERPRET: call ENTER
     dd DOLITERAL, 32, _WORD, FIND, QBRANCH, 12
@@ -181,4 +188,4 @@ TIBUF   db "10 SQUARED BYE", 0
 section .data
 TIB     dd TIBUF
 PAD     times 128 db 0
-LATEST  dd ntSQUARED
+LATEST  dd latest_tok
