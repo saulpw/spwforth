@@ -30,6 +30,7 @@ gotspace:
         mov al, 0
         stosb          ; store terminating NUL
 
+        dec esi        ; start next WORD at space/NUL
         mov [TIB], esi
 
         mov ebx, PAD   ; returned word always at start of PAD
