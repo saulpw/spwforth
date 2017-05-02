@@ -3,7 +3,7 @@
 bits 32
 
 global main
-extern strtol, printf, read
+extern strtol, printf, read, snprintf
 
 %define latest_tok 0  ; tail of dictionary linked list
 
@@ -91,7 +91,8 @@ dictentry TONUM, ">NUMBER"
         push ebp   ; top of return stack is an okay place to put a local return value
         push ebx
         call strtol
-        add esp, 12
+        pop ebx
+        add esp, 8
         mov edx, [ebp]     ; edx := *endptr
         cmp byte [edx], 0  ; "if **endptr is '\0' on return, the entire string is valid"
         jnz wordnotfound
@@ -101,21 +102,47 @@ dictentry TONUM, ">NUMBER"
 nffmt   db "word not found: %s", 13, 10, 0
 wordnotfound:
         push ebx
-        push nffmt
-        call printf
+        push 1
+        mov ebx, nffmt
+        mov eax, SPRINTF
+        call ASMEXEC
 
-        mov esp, [SP0]
-        mov esi, pQUIT
-        jmp NEXT
+        mov esi, pQUIT  ; QUIT after 'calling' TYPE
+        jmp TYPE
 
-intfmt  db "%d ", 13, 10
-dictentry PRINTNUM, "."
-        push ebx
-        push intfmt
-        call printf
-        add esp, 8
+dictentry TYPE, "TYPE"
+        mov edx, ebx   ; count
+        pop ecx        ; ptr to buf
+        mov ebx, 1     ; stdout
+        mov eax, 0x04  ; sys_write
+        int 0x80
+
         pop ebx
         NEXT
+
+dictentry SPRINTF, "SPRINTF"  ; ( ?args? nargs fmtstr -- PAD n )
+        pop ecx
+        RPUSH ecx
+        push ebx
+        push 128
+        push PAD
+        call snprintf
+        add esp, 12
+        RPOP ecx
+        shl ecx, 2
+        add esp, ecx   ; remove args to snprintf
+        push PAD
+        mov ebx, eax
+        NEXT
+
+intfmt  db "%d ", 0
+dictentry PRINTNUM, "."
+        push ebx
+        push 1
+        mov ebx, intfmt
+        mov eax, SPRINTF
+        call ASMEXEC
+        jmp TYPE
 
 %include "interpret.asm"
 
@@ -144,6 +171,20 @@ dictentry QUIT, "QUIT"
         dd RP_CLEAR
         dd TIB_CLEAR
         dd INTERPRET, BRANCH, -12
+
+; eax = xt of forth word, then 'call ASMEXEC'.  note that esi, edi, ebx, etc must be valid in the forth context
+ASMEXEC:
+    pop edx   ; ret address from call
+    RPUSH esi ; inline ENTER
+    mov esi, ASMEXEC_CONT
+    RPUSH edx ; save on ret stack
+    jmp eax
+
+ASMEXEC_CONT dd asm_RET_TO_ASM
+asm_RET_TO_ASM:
+    RPOP eax
+    RPOP esi  ; inline EXIT
+    jmp eax
 
 dictentry ABORT, "ABORT"
         call ENTER
