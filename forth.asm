@@ -253,6 +253,17 @@ dictentry QUIT, "QUIT"
         dd TIB_CLEAR
         dd INTERPRET, BRANCH, -12
 
+dictentry EMIT, "EMIT"
+        push ebx
+        mov eax, 0x04  ; sys_write
+        mov ebx, 1     ; stdout
+        lea ecx, [ESP] ; pointer to the char at TOS
+        mov edx, 1     ; count
+        int 0x80
+        add esp, 4     ; ditch old TOS
+        pop ebx        ; new TOS
+        NEXT
+
 ; eax = xt of forth word, then 'call ASMEXEC'.  note that esi, edi, ebx, etc must be valid in the forth context
 ASMEXEC:
     pop edx   ; ret address from call
@@ -266,6 +277,10 @@ asm_RET_TO_ASM:
     RPOP eax
     RPOP esi  ; inline EXIT
     jmp eax
+
+dictentry CR, "CR"
+        call ENTER
+        dd DOLITERAL, 13, EMIT, DOLITERAL, 10, EMIT, EXIT
 
 dictentry ABORT, "ABORT"
         call ENTER

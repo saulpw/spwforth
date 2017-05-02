@@ -3,7 +3,6 @@ dictentry _WORD, "WORD"
         push esi
         push edi
 
-restart:
         mov esi, [TIB]
         or esi, esi    ; if no source for input buffer
         jz getline
@@ -41,6 +40,12 @@ gotspace:
 
 ; should become REFILL ( -- flag ) at some point
 getline:
+        pop edi
+        pop esi
+
+        mov eax, CR
+        call ASMEXEC
+
         push 128
         push TIBUF
         push 0   ; stdin
@@ -48,7 +53,7 @@ getline:
         add esp, 12
         mov byte [eax+TIBUF-1], 0   ; replace \n with NUL
         mov dword [TIB], TIBUF
-        jmp restart
+        jmp _WORD       ; restart
 
 dictentry FIND, "FIND"  ; ( str -- str|xt 0|1|-1 )
         push esi
