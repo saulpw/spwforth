@@ -76,6 +76,19 @@ dictentry DUP, "DUP"
         push ebx
         NEXT
 
+dictentry SWAP, "SWAP"
+        xchg ebx, [esp]
+        NEXT
+
+dictentry DROP, "DROP"
+        pop ebx
+        NEXT
+
+dictentry OVER, "OVER"
+        push ebx
+        mov ebx, [esp+4]
+        NEXT
+
 dotessfmt db "<%d> ", 0
 dictentry DOTESS, ".S"
         mov ecx, [SP0]
@@ -122,6 +135,31 @@ dictentry STAR, "*"
         pop eax
         imul ebx
         mov ebx, eax
+        NEXT
+
+dictentry PLUS, "+"
+        pop eax
+        add ebx, eax
+        NEXT
+
+dictentry MINUS, "-"
+        pop eax
+        sub eax, ebx
+        mov ebx, eax
+        NEXT
+
+dictentry SLASH, "/"
+        xor edx, edx
+        pop eax
+        idiv ebx
+        mov ebx, eax
+        NEXT
+
+dictentry MOD, "MOD"
+        xor edx, edx
+        pop eax
+        idiv ebx
+        mov ebx, edx
         NEXT
 
 dictentry BYE, "BYE"
