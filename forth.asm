@@ -76,6 +76,48 @@ dictentry DUP, "DUP"
         push ebx
         NEXT
 
+dotessfmt db "<%d> ", 0
+dictentry DOTESS, ".S"
+        mov ecx, [SP0]
+        sub ecx, esp
+        sar ecx, 2
+        dec ecx      ; ecx := number of elements on stack
+
+        RPUSH ecx
+
+        push ebx   ; push TOS under rest of args to SPRINTF
+
+        push ecx
+        push 1
+        mov ebx, dotessfmt
+        mov eax, SPRINTF
+        call ASMEXEC
+        mov eax, TYPE
+        call ASMEXEC
+
+        RPOP ecx
+
+nextcell:
+        or ecx, ecx
+        jz done
+
+        push ebx   ; push TOS on stack proper
+
+        RPUSH ecx
+
+        push dword [ecx*4+esp-4]
+        push 1
+        mov ebx, intfmt
+        mov eax, SPRINTF
+        call ASMEXEC
+        mov eax, TYPE
+        call ASMEXEC
+
+        RPOP ecx
+        loop nextcell
+
+done:   NEXT
+
 dictentry STAR, "*"
         pop eax
         imul ebx
@@ -88,7 +130,7 @@ dictentry BYE, "BYE"
 
 dictentry TONUM, ">NUMBER"
         push 0     ; base == 0 for 0x support (but beware octal with leading 0 otherwise)
-        push ebp   ; top of return stack is an okay place to put a local return value
+        push ebp   ; above return stack is an okay place to put a local return value
         push ebx
         call strtol
         pop ebx
@@ -160,6 +202,7 @@ dictentry RP_CLEAR, "RP_CLEAR"
 
 dictentry SP_CLEAR, "SP_CLEAR"
         mov esp, [SP0]
+        push 0x0          ; bogus value under stack
         NEXT
 
 dictentry TIB_CLEAR, "TIB_CLEAR"
