@@ -38,7 +38,7 @@ main:
         lea ebp, [esp+4]  ; ebp = return stack, grows up
         mov [RP0], ebp
         mov [SP0], esp
-        mov esi, pQUIT    ; esi = Forth PC
+        mov esi, pABORT   ; esi = Forth PC
         NEXT
 
 ENTER:  RPUSH esi
@@ -233,6 +233,8 @@ dictentry ABORT, "ABORT"
         call ENTER
         dd SP_CLEAR
 pQUIT   dd QUIT
+
+pABORT  dd ABORT
 
 section .data
 TIBUF   times 128 db 0
