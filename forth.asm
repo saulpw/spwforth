@@ -1,5 +1,13 @@
 ; a clean direct-threaded Forth implementation
 
+; register allocation
+; ebx = value of TOS
+; esp = address of data stack, grows down
+; ebp = address of return stack, grows up
+; esi = address of Forth PC
+; edi = HERE (end of dictionary, start of free space)
+; eax, ecx, edx are all remaining for use
+
 bits 32
 
 global main
