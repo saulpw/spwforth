@@ -146,6 +146,27 @@ dictentry TUCK, "TUCK"   ; ( a b -- b a b )
         push eax
         NEXT
 
+dictentry PICK, "PICK"   ; ( ... n -- ... [n] )
+        mov ebx, [esp+ebx*4]
+        NEXT
+
+dictentry ROLL, "ROLL"   ; ( [n] ... n -- ... [n] )
+        mov [ebp+4], esi
+        mov [ebp+8], edi
+
+        mov ecx, ebx
+        lea esi, [esp+ebx*4-4]
+        lea edi, [esp+ebx*4]
+        mov ebx, [edi]   ; TOS := nth element
+        std
+        rep movsd
+        cld
+
+        mov esi, [ebp+4]
+        mov edi, [ebp+8]
+        add esp, 4
+        NEXT
+
 dictentry BYE, "BYE"
         mov eax, 1         ; eax = syscall 1 (exit)
         int 0x80           ; ebx = exit code (conveniently also TOS)
