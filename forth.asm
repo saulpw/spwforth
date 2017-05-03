@@ -136,6 +136,16 @@ dictentry ROT, "ROT"   ; ( a b c -- b c a )
         mov ebx, edx
         NEXT
 
+dictentry NIP, "NIP"   ; ( a b -- b )
+        add esp, 4
+        NEXT
+
+dictentry TUCK, "TUCK"   ; ( a b -- b a b )
+        pop eax
+        push ebx
+        push eax
+        NEXT
+
 dictentry BYE, "BYE"
         mov eax, 1         ; eax = syscall 1 (exit)
         int 0x80           ; ebx = exit code (conveniently also TOS)
