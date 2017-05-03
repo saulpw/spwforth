@@ -146,6 +146,18 @@ dictentry TUCK, "TUCK"   ; ( a b -- b a b )
         push eax
         NEXT
 
+dictentry TWODUP, "2DUP"  ; ( a b -- a b a b )
+        call ENTER
+        dd OVER, OVER, EXIT
+
+dictentry TWOSWAP, "2SWAP"  ; ( a b c d -- c d a b )
+        call ENTER
+        dd DOLITERAL, 3, ROLL, DOLITERAL, 3, ROLL, EXIT
+
+dictentry TWOOVER, "2OVER"  ; ( a b c d -- a b c d a b )
+        call ENTER
+        dd DOLITERAL, 3, PICK, DOLITERAL, 3, PICK, EXIT
+
 dictentry PICK, "PICK"   ; ( ... n -- ... [n] )
         mov ebx, [esp+ebx*4]
         NEXT
