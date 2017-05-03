@@ -76,52 +76,52 @@ QBRANCH:
         lodsd
         cmp ebx, 0
         pop ebx
-        jnz QB1       ; if TOS == 0, PC += eax
+        jnz QB1         ; if TOS == 0, PC += eax
         add esi, eax
 QB1:    NEXT
 
-dictentry DUP, "DUP"
+dictentry DUP, "DUP"    ; ( a -- a a )
         push ebx
         NEXT
 
-dictentry SWAP, "SWAP"
+dictentry SWAP, "SWAP"  ; ( a b -- b a )
         xchg ebx, [esp]
         NEXT
 
-dictentry DROP, "DROP"
+dictentry DROP, "DROP"  ; ( a -- )
         pop ebx
         NEXT
 
-dictentry OVER, "OVER"
+dictentry OVER, "OVER"  ; ( a b -- a b a )
         push ebx
         mov ebx, [esp+4]
         NEXT
 
-dictentry STAR, "*"
+dictentry STAR, "*"  ; ( a b -- a*b )
         pop eax
         imul ebx
         mov ebx, eax
         NEXT
 
-dictentry PLUS, "+"
+dictentry PLUS, "+"  ; ( a b -- a+b )
         pop eax
         add ebx, eax
         NEXT
 
-dictentry MINUS, "-"
+dictentry MINUS, "-"  ; ( a b -- a-b )
         pop eax
         sub eax, ebx
         mov ebx, eax
         NEXT
 
-dictentry SLASH, "/"
+dictentry SLASH, "/"  ; ( a b -- a/b )
         xor edx, edx
         pop eax
         idiv ebx
         mov ebx, eax
         NEXT
 
-dictentry MOD, "MOD"
+dictentry MOD, "MOD"  ; ( a b -- a%b )
         xor edx, edx
         pop eax
         idiv ebx
