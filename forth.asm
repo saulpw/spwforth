@@ -11,7 +11,7 @@
 bits 32
 
 global main
-extern strtol, printf, read, snprintf
+extern strtol, printf, read, snprintf, strlen
 
 %define latest_tok 0  ; tail of dictionary linked list
 
@@ -66,6 +66,20 @@ EXECUTE:
         pop eax
         xchg eax, ebx
         jmp eax
+
+dictentry QDUP, "?DUP"    ; ( 0|a -- 0|a a )
+        or ebx, ebx
+        jz qdupdone
+        push ebx
+qdupdone: NEXT
+
+dictentry LTZERO, "<0"    ; ( v -- v<0 )
+        cmp ebx, 0
+        jge false
+        mov ebx, 1
+        NEXT
+false:  mov ebx, 0
+        NEXT
 
 BRANCH:
         lodsd
@@ -207,7 +221,14 @@ wordnotfound:
         mov esi, pQUIT  ; QUIT after 'calling' TYPE
         jmp TYPE
 
-dictentry TYPE, "TYPE"
+dictentry STRLEN, "STRLEN"
+        push ebx
+        call strlen
+        mov ebx, eax
+        add esp, 4
+        NEXT
+
+dictentry TYPE, "TYPE" ; ( ptr n -- )
         mov edx, ebx   ; count
         pop ecx        ; ptr to buf
         mov ebx, 1     ; stdout
@@ -218,6 +239,7 @@ dictentry TYPE, "TYPE"
         NEXT
 
 dictentry SPRINTF, "SPRINTF"  ; ( ?args? nargs fmtstr -- PAD n )
+
         pop ecx
         RPUSH ecx
         push ebx
@@ -241,15 +263,69 @@ dictentry PRINTNUM, "."
         call ASMEXEC
         jmp TYPE
 
+dictentry FETCH, "@"   ; ( ptr -- v )
+        mov ebx, [ebx]
+        NEXT
+
+dictentry STORE, "!"   ; ( v ptr -- )
+        pop eax
+        mov [ebx], eax
+        pop ebx
+        NEXT
+
+dictentry COMMA, ","   ; ( v -- )
+        mov eax, ebx
+        stosd
+        pop ebx
+        NEXT
+
+dictentry CREATE, "CREATE"   ; ( "<token>" -- )
+;       align 16, db 0
+        mov eax, edi
+        xchg eax, [LATEST]
+        stosd
+
+        mov eax, _WORD
+        call ASMEXEC
+        add edi, 16
+        NEXT
+
+dictentry RBRACKET, "]"   ; ( "<token>" -- )
+        mov dword [_STATE], 1  ; compilation state
+        NEXT
+
+dictentry LBRACKET, "["   ; ( "<token>" -- )
+        mov dword [_STATE], 0  ; interpret state
+        NEXT
+
+dictentry COLON, ":"   ; ( "<token>" -- )
+        call ENTER
+        dd CREATE, RBRACKET, EXIT
+
+dictentry SEMICOLON, ";"   ; ( "<token>" -- )
+        call ENTER
+        dd DOLITERAL, EXIT, LBRACKET, EXIT
+
 %include "interpret.asm"
 
-dictentry SQUARED, "SQUARED"
+dictentry LITERAL, "LITERAL"
         call ENTER
-        dd DUP, STAR, EXIT
+        dd DOLITERAL, DOLITERAL, COMMA, COMMA, EXIT
 
-INTERPRET: call ENTER
-        dd DOLITERAL, 32, _WORD, FIND, QBRANCH, 12
+INTERPRET_WORD: call ENTER
+        dd DOLITERAL, 32, _WORD
+;        dd DUP, DUP, STRLEN, TYPE, CR  ; debug
+        dd FIND, QBRANCH, 12
         dd EXECUTE, BRANCH, 4, TONUM, EXIT
+
+COMPILE_WORD: call ENTER
+        dd DOLITERAL, 32, _WORD
+        dd FIND
+        dd QDUP, QBRANCH, 36, LTZERO
+        dd QBRANCH, 12, EXECUTE, BRANCH, 4, COMMA
+        dd BRANCH, 8
+        dd TONUM, LITERAL
+        dd EXIT
 
 dictentry RP_CLEAR, "RP_CLEAR"
         mov ebp, [RP0]
@@ -268,7 +344,8 @@ dictentry QUIT, "QUIT"
         call ENTER
         dd RP_CLEAR
         dd TIB_CLEAR
-        dd INTERPRET, BRANCH, -12
+        dd STATE, FETCH, QBRANCH, 12, COMPILE_WORD, BRANCH, 4, INTERPRET_WORD
+        dd BRANCH, -40
 
 dictentry EMIT, "EMIT"
         push ebx
@@ -299,6 +376,11 @@ dictentry CR, "CR"
         call ENTER
         dd DOLITERAL, 13, EMIT, DOLITERAL, 10, EMIT, EXIT
 
+dictentry STATE, "STATE"
+        push ebx
+        mov ebx, _STATE
+        NEXT
+
 dictentry ABORT, "ABORT"
         call ENTER
         dd SP_CLEAR
@@ -310,6 +392,7 @@ section .data
 TIBUF   times 128 db 0
 TIB     dd 0
 PAD     times 128 db 0
+_STATE   dd 0
 LATEST  dd latest_tok
 SP0     dd 0
 RP0     dd 0
