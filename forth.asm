@@ -128,6 +128,14 @@ dictentry MOD, "MOD"  ; ( a b -- a%b )
         mov ebx, edx
         NEXT
 
+dictentry ROT, "ROT"   ; ( a b c -- b c a )
+        pop ecx
+        pop edx
+        push ecx
+        push ebx
+        mov ebx, edx
+        NEXT
+
 dictentry BYE, "BYE"
         mov eax, 1         ; eax = syscall 1 (exit)
         int 0x80           ; ebx = exit code (conveniently also TOS)
