@@ -11,7 +11,7 @@
 bits 32
 
 global main
-extern strtol, printf, read, snprintf, strlen
+extern strtol, read, snprintf
 
 %define latest_tok 0  ; tail of dictionary linked list
 
@@ -32,14 +32,25 @@ extern strtol, printf, read, snprintf, strlen
 
 ; use like: dictentry STAR, "*"
 %macro dictentry 2
-       align 16, db 0
+%strlen namelen %2
 nt_%1  dd latest_tok
 %define latest_tok nt_%1
-       db %2
-       align 16, db 0
+       db 0          ; not immediate
+       db namelen
+name_%1 db %2
 %1:
 %endmacro
 
+; use like: dictentry SEMI, ";", 1
+%macro dictentry 3
+%strlen namelen %2
+nt_%1  dd latest_tok
+%define latest_tok nt_%1
+       db 0x80       ; immediate (macro arg doesn't matter)
+       db namelen
+       db %2
+%1:
+%endmacro
 
 main:
         sub esp, 0x40     ; esp = data stack, grows down
@@ -47,7 +58,10 @@ main:
         mov [RP0], ebp
         mov [SP0], esp
         mov esi, pABORT   ; esi = Forth PC
+        mov edi, available ; edi = HERE
         NEXT
+
+; start of dictionary
 
 ENTER:  RPUSH esi
         pop esi           ; get parameter field address from 'call ENTER'
@@ -73,9 +87,9 @@ dictentry QDUP, "?DUP"    ; ( 0|a -- 0|a a )
         push ebx
 qdupdone: NEXT
 
-dictentry LTZERO, "<0"    ; ( v -- v<0 )
+dictentry GTZERO, ">0"    ; ( v -- v<0 )
         cmp ebx, 0
-        jge false
+        jle false
         mov ebx, 1
         NEXT
 false:  mov ebx, 0
@@ -122,6 +136,10 @@ dictentry PLUS, "+"  ; ( a b -- a+b )
         add ebx, eax
         NEXT
 
+dictentry INCR, "1+"  ; ( a -- a+1 )
+        inc ebx
+        NEXT
+
 dictentry MINUS, "-"  ; ( a b -- a-b )
         pop eax
         sub eax, ebx
@@ -161,16 +179,28 @@ dictentry TUCK, "TUCK"   ; ( a b -- b a b )
         NEXT
 
 dictentry TWODUP, "2DUP"  ; ( a b -- a b a b )
-        call ENTER
-        dd OVER, OVER, EXIT
+;        call ENTER
+;        dd OVER, OVER, EXIT
+        push ebx
+        push dword [esp+8]
+        NEXT
 
 dictentry TWOSWAP, "2SWAP"  ; ( a b c d -- c d a b )
-        call ENTER
-        dd DOLITERAL, 3, ROLL, DOLITERAL, 3, ROLL, EXIT
+;        call ENTER
+;        dd DOLITERAL, 3, ROLL, DOLITERAL, 3, ROLL, EXIT
+        xchg ebx, [esp+8]
+        mov eax, [esp+12]
+        xchg eax, [esp+4]
+        mov [esp+12], eax
+        NEXT
 
 dictentry TWOOVER, "2OVER"  ; ( a b c d -- a b c d a b )
-        call ENTER
-        dd DOLITERAL, 3, PICK, DOLITERAL, 3, PICK, EXIT
+;        call ENTER
+;        dd DOLITERAL, 3, PICK, DOLITERAL, 3, PICK, EXIT
+        push ebx
+        push dword [esp+16]
+        mov ebx, [esp+16]
+        NEXT
 
 dictentry PICK, "PICK"   ; ( ... n -- ... [n] )
         mov ebx, [esp+ebx*4]
@@ -200,6 +230,7 @@ dictentry BYE, "BYE"
 dictentry TONUM, ">NUMBER"
         push 0     ; base == 0 for 0x support (but beware octal with leading 0 otherwise)
         push ebp   ; above return stack is an okay place to put a local return value
+        inc ebx
         push ebx
         call strtol
         pop ebx
@@ -218,15 +249,8 @@ wordnotfound:
         mov eax, SPRINTF
         call ASMEXEC
 
-        mov esi, pQUIT  ; QUIT after 'calling' TYPE
+        mov esi, pQUIT     ; QUIT after 'calling' TYPE
         jmp TYPE
-
-dictentry STRLEN, "STRLEN"
-        push ebx
-        call strlen
-        mov ebx, eax
-        add esp, 4
-        NEXT
 
 dictentry TYPE, "TYPE" ; ( ptr n -- )
         mov edx, ebx   ; count
@@ -239,17 +263,19 @@ dictentry TYPE, "TYPE" ; ( ptr n -- )
         NEXT
 
 dictentry SPRINTF, "SPRINTF"  ; ( ?args? nargs fmtstr -- PAD n )
+        pop ecx        ; ecx := nargs
+        RPUSH ecx      ; save nargs on return stack
 
-        pop ecx
-        RPUSH ecx
-        push ebx
+        push ebx       ; fmtstr
         push 128
         push PAD
         call snprintf
         add esp, 12
+
         RPOP ecx
         shl ecx, 2
         add esp, ecx   ; remove args to snprintf
+
         push PAD
         mov ebx, eax
         NEXT
@@ -273,21 +299,43 @@ dictentry STORE, "!"   ; ( v ptr -- )
         pop ebx
         NEXT
 
+dictentry ADDSTORE, "+!"   ; ( n ptr -- )
+        pop eax
+        add [ebx], eax
+        pop ebx
+        NEXT
+
 dictentry COMMA, ","   ; ( v -- )
         mov eax, ebx
         stosd
         pop ebx
         NEXT
 
+dictentry IMMEDIATE, "IMMEDIATE"   ; ( -- )
+        mov eax, [LATEST]
+        or byte [eax+4], 0x80
+        NEXT
+
 dictentry CREATE, "CREATE"   ; ( "<token>" -- )
-;       align 16, db 0
         mov eax, edi
         xchg eax, [LATEST]
-        stosd
-
+        stosd       ; link pointer
+        mov al, 0
+        stosb       ; flags (!immediate)
+        push ebx
+        mov ebx, 32    ; until next space
         mov eax, _WORD
         call ASMEXEC
-        add edi, 16
+        movzx eax, byte [edi]  ; count
+        lea edi, [edi+eax+1]
+
+        ; set up 'call ENTER'
+        mov al, 0xe8           ; rel32 call
+        stosb
+        mov eax, ENTER
+        sub eax, edi
+        sub eax, 4             ; (edi-1)+5+eax := ENTER
+        stosd 
         NEXT
 
 dictentry RBRACKET, "]"   ; ( "<token>" -- )
@@ -302,9 +350,9 @@ dictentry COLON, ":"   ; ( "<token>" -- )
         call ENTER
         dd CREATE, RBRACKET, EXIT
 
-dictentry SEMICOLON, ";"   ; ( "<token>" -- )
+dictentry SEMICOLON, ";", 1   ; ( "<token>" -- )
         call ENTER
-        dd DOLITERAL, EXIT, LBRACKET, EXIT
+        dd DOLITERAL, EXIT, COMMA, LBRACKET, EXIT
 
 %include "interpret.asm"
 
@@ -314,14 +362,13 @@ dictentry LITERAL, "LITERAL"
 
 INTERPRET_WORD: call ENTER
         dd DOLITERAL, 32, _WORD
-;        dd DUP, DUP, STRLEN, TYPE, CR  ; debug
         dd FIND, QBRANCH, 12
         dd EXECUTE, BRANCH, 4, TONUM, EXIT
 
 COMPILE_WORD: call ENTER
         dd DOLITERAL, 32, _WORD
         dd FIND
-        dd QDUP, QBRANCH, 36, LTZERO
+        dd QDUP, QBRANCH, 36, GTZERO
         dd QBRANCH, 12, EXECUTE, BRANCH, 4, COMMA
         dd BRANCH, 8
         dd TONUM, LITERAL
@@ -392,7 +439,9 @@ section .data
 TIBUF   times 128 db 0
 TIB     dd 0
 PAD     times 128 db 0
-_STATE   dd 0
 LATEST  dd latest_tok
 SP0     dd 0
 RP0     dd 0
+_STATE  dd 0
+
+available times 16384 db 0  ; rest of dictionary

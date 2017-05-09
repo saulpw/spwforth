@@ -43,13 +43,13 @@ done:   NEXT
 
 dictentry _WORD, "WORD"
         push esi
-        push edi
+
+        mov ecx, edi   ; ecx := saved HERE
+        inc edi        ; reserve one char for length
 
         mov esi, [TIB]
         or esi, esi    ; if no source for input buffer
         jz getline
-
-        mov edi, PAD
 
 nextchar:
         lodsb
@@ -62,11 +62,13 @@ nextchar:
         jmp nextchar
 
 gotzero:               ; end of string:
-        cmp edi, PAD   ; if no characters stored yet
+        lea eax, [edi-1] ; minus length byte
+        cmp eax, ecx   ; if no characters stored yet
         jz getline     ; get line of input from user
 
 gotspace:
-        cmp edi, PAD   ; if leading spaces
+        lea eax, [edi-1] ; minus length byte
+        cmp eax, ecx   ; if leading spaces only
         jz nextchar    ; just continue
         mov al, 0
         stosb          ; store terminating NUL
@@ -74,15 +76,20 @@ gotspace:
         dec esi        ; start next WORD at space/NUL
         mov [TIB], esi
 
-        mov ebx, PAD   ; returned word always at start of PAD
+        mov edx, edi
+        sub edx, ecx
+        sub edx, 2     ; edx := char count (remove len and NUL term bytes)
 
-        pop edi
+        mov edi, ecx   ; restore saved HERE
         pop esi
+
+        mov ebx, edi   ; returned word starts at current HERE
+        mov [ebx], dl  ; backfill strlen (count of chars)
         NEXT
 
 ; should become REFILL ( -- flag ) at some point
 getline:
-        pop edi
+        mov edi, ecx   ; restore saved HERE
         pop esi
 
         mov eax, CR
@@ -97,28 +104,30 @@ getline:
         mov dword [TIB], TIBUF
         jmp _WORD       ; restart
 
-dictentry FIND, "FIND"  ; ( str -- str|xt 0|1|-1 )
+dictentry FIND, "FIND"  ; ( tok -- tok|xt 0|1|-1 )
         push esi
         push edi
 
-        mov edi, ebx      ; given string pointer
-        mov ecx, 128
-        mov al, 0
-        repnz scasb       ;
-        mov eax, edi
-        sub eax, ebx      ; put strlen in eax
-
         mov edx, [LATEST]
 
-nextword:
-        lea esi, [edx+4]  ; dict name
-        mov edi, ebx      ; esi = str
-        mov ecx, eax      ; eax = strlen(str)
+checkword:
+        movzx ecx, byte [ebx]  ; ecx := strlen(tok)
+        mov edi, ebx      ; edi := tok
+        inc edi
+
+        lea esi, [edx+5]  ; esi := ptr to dict namelen
+        xor eax, eax
+        lodsb             ; eax := namelen, esi := nameptr
+        cmp eax, ecx
+        jnz nextword      ; skip if lengths are different
+
         repz cmpsb
         jz found
+
+nextword:
         mov edx, [edx]
         or edx, edx       ;  link != 0 (more dictionary entries)
-        jnz nextword
+        jnz checkword
 
 notfound:
         pop edi
@@ -131,7 +140,13 @@ found:
         pop edi
         pop esi
 
-        add edx, 16       ; get xt from nt
-        push edx
+        mov cl, byte [edx+4]     ; immediate flag (0x80)
+        mov ebx, -1
+        test cl, 0x80
+        jz notimmed
         mov ebx, 1
+notimmed:
+        lea edx, [edx+eax+6]     ; get xt from header (6=link+namelen+NUL+flags)
+
+        push edx
         NEXT
