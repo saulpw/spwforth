@@ -11,7 +11,7 @@
 bits 32
 
 global main
-extern strtol, printf, read, snprintf
+extern strtol, read, snprintf
 
 %define latest_tok 0  ; tail of dictionary linked list
 
@@ -147,16 +147,28 @@ dictentry TUCK, "TUCK"   ; ( a b -- b a b )
         NEXT
 
 dictentry TWODUP, "2DUP"  ; ( a b -- a b a b )
-        call ENTER
-        dd OVER, OVER, EXIT
+;        call ENTER
+;        dd OVER, OVER, EXIT
+        push ebx
+        push dword [esp+8]
+        NEXT
 
 dictentry TWOSWAP, "2SWAP"  ; ( a b c d -- c d a b )
-        call ENTER
-        dd DOLITERAL, 3, ROLL, DOLITERAL, 3, ROLL, EXIT
+;        call ENTER
+;        dd DOLITERAL, 3, ROLL, DOLITERAL, 3, ROLL, EXIT
+        xchg ebx, [esp+8]
+        mov eax, [esp+12]
+        xchg eax, [esp+4]
+        mov [esp+12], eax
+        NEXT
 
 dictentry TWOOVER, "2OVER"  ; ( a b c d -- a b c d a b )
-        call ENTER
-        dd DOLITERAL, 3, PICK, DOLITERAL, 3, PICK, EXIT
+;        call ENTER
+;        dd DOLITERAL, 3, PICK, DOLITERAL, 3, PICK, EXIT
+        push ebx
+        push dword [esp+16]
+        mov ebx, [esp+16]
+        NEXT
 
 dictentry PICK, "PICK"   ; ( ... n -- ... [n] )
         mov ebx, [esp+ebx*4]
