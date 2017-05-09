@@ -278,11 +278,54 @@ dictentry COMMA, ","   ; ( v -- )
         pop ebx
         NEXT
 
+dictentry IMMEDIATE, "IMMEDIATE"   ; ( -- )
+        mov eax, [LATEST]
+        or byte [eax+4], 0x80
+        NEXT
+
+dictentry CREATE, "CREATE"   ; ( "<token>" -- )
+        mov eax, edi
+        xchg eax, [LATEST]
+        stosd       ; link pointer
+        mov al, 0
+        stosb       ; flags (!immediate)
+        push ebx
+        mov ebx, 32    ; until next space
+        mov eax, _WORD
+        call ASMEXEC
+        movzx eax, byte [edi]  ; count
+        lea edi, [edi+eax+1]
+
+        ; set up 'call ENTER'
+        mov al, 0xe8           ; rel32 call
+        stosb
+        mov eax, ENTER
+        sub eax, edi
+        sub eax, 4             ; (edi-1)+5+eax := ENTER
+        stosd 
+        NEXT
+
+dictentry RBRACKET, "]"   ; ( "<token>" -- )
+        mov dword [_STATE], 1  ; compilation state
+        NEXT
+
+dictentry LBRACKET, "["   ; ( "<token>" -- )
+        mov dword [_STATE], 0  ; interpret state
+        NEXT
+
+dictentry COLON, ":"   ; ( "<token>" -- )
+        call ENTER
+        dd CREATE, RBRACKET, EXIT
+
+dictentry SEMICOLON, ";", 1   ; ( "<token>" -- )
+        call ENTER
+        dd DOLITERAL, EXIT, COMMA, LBRACKET, EXIT
+
 %include "interpret.asm"
 
-dictentry SQUARED, "SQUARED"
+dictentry LITERAL, "LITERAL"
         call ENTER
-        dd DUP, STAR, EXIT
+        dd DOLITERAL, DOLITERAL, COMMA, COMMA, EXIT
 
 INTERPRET: call ENTER
         dd DOLITERAL, 32, _WORD, FIND, QBRANCH, 12
@@ -336,6 +379,11 @@ dictentry CR, "CR"
         call ENTER
         dd DOLITERAL, 13, EMIT, DOLITERAL, 10, EMIT, EXIT
 
+dictentry STATE, "STATE"
+        push ebx
+        mov ebx, _STATE
+        NEXT
+
 dictentry ABORT, "ABORT"
         call ENTER
         dd SP_CLEAR
@@ -350,4 +398,6 @@ PAD     times 128 db 0
 LATEST  dd latest_tok
 SP0     dd 0
 RP0     dd 0
+_STATE  dd 0
+
 available times 16384 db 0  ; rest of dictionary
