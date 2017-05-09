@@ -32,11 +32,12 @@ extern strtol, read, snprintf
 
 ; use like: dictentry STAR, "*"
 %macro dictentry 2
-       align 16, db 0
+%strlen namelen %2
 nt_%1  dd latest_tok
 %define latest_tok nt_%1
-       db %2
-       align 16, db 0
+       db 0          ; not immediate
+       db namelen
+name_%1 db %2
 %1:
 %endmacro
 
@@ -47,6 +48,7 @@ main:
         mov [RP0], ebp
         mov [SP0], esp
         mov esi, pABORT   ; esi = Forth PC
+        mov edi, available ; edi = HERE
         NEXT
 
 ENTER:  RPUSH esi
@@ -198,6 +200,7 @@ dictentry BYE, "BYE"
 dictentry TONUM, ">NUMBER"
         push 0     ; base == 0 for 0x support (but beware octal with leading 0 otherwise)
         push ebp   ; above return stack is an okay place to put a local return value
+        inc ebx
         push ebx
         call strtol
         pop ebx
@@ -252,6 +255,28 @@ dictentry PRINTNUM, "."
         mov eax, SPRINTF
         call ASMEXEC
         jmp TYPE
+
+dictentry FETCH, "@"   ; ( ptr -- v )
+        mov ebx, [ebx]
+        NEXT
+
+dictentry STORE, "!"   ; ( v ptr -- )
+        pop eax
+        mov [ebx], eax
+        pop ebx
+        NEXT
+
+dictentry ADDSTORE, "+!"   ; ( n ptr -- )
+        pop eax
+        add [ebx], eax
+        pop ebx
+        NEXT
+
+dictentry COMMA, ","   ; ( v -- )
+        mov eax, ebx
+        stosd
+        pop ebx
+        NEXT
 
 %include "interpret.asm"
 
@@ -325,3 +350,4 @@ PAD     times 128 db 0
 LATEST  dd latest_tok
 SP0     dd 0
 RP0     dd 0
+available times 16384 db 0  ; rest of dictionary
