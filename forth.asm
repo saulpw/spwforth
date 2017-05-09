@@ -41,6 +41,16 @@ name_%1 db %2
 %1:
 %endmacro
 
+; use like: dictentry SEMI, ";", 1
+%macro dictentry 3
+%strlen namelen %2
+nt_%1  dd latest_tok
+%define latest_tok nt_%1
+       db 0x80       ; immediate (macro arg doesn't matter)
+       db namelen
+       db %2
+%1:
+%endmacro
 
 main:
         sub esp, 0x40     ; esp = data stack, grows down
@@ -68,6 +78,20 @@ EXECUTE:
         pop eax
         xchg eax, ebx
         jmp eax
+
+dictentry QDUP, "?DUP"    ; ( 0|a -- 0|a a )
+        or ebx, ebx
+        jz qdupdone
+        push ebx
+qdupdone: NEXT
+
+dictentry GTZERO, ">0"    ; ( v -- v<0 )
+        cmp ebx, 0
+        jle false
+        mov ebx, 1
+        NEXT
+false:  mov ebx, 0
+        NEXT
 
 BRANCH:
         lodsd
@@ -327,9 +351,19 @@ dictentry LITERAL, "LITERAL"
         call ENTER
         dd DOLITERAL, DOLITERAL, COMMA, COMMA, EXIT
 
-INTERPRET: call ENTER
-        dd DOLITERAL, 32, _WORD, FIND, QBRANCH, 12
+INTERPRET_WORD: call ENTER
+        dd DOLITERAL, 32, _WORD
+        dd FIND, QBRANCH, 12
         dd EXECUTE, BRANCH, 4, TONUM, EXIT
+
+COMPILE_WORD: call ENTER
+        dd DOLITERAL, 32, _WORD
+        dd FIND
+        dd QDUP, QBRANCH, 36, GTZERO
+        dd QBRANCH, 12, EXECUTE, BRANCH, 4, COMMA
+        dd BRANCH, 8
+        dd TONUM, LITERAL
+        dd EXIT
 
 dictentry RP_CLEAR, "RP_CLEAR"
         mov ebp, [RP0]
@@ -348,7 +382,8 @@ dictentry QUIT, "QUIT"
         call ENTER
         dd RP_CLEAR
         dd TIB_CLEAR
-        dd INTERPRET, BRANCH, -12
+        dd STATE, FETCH, QBRANCH, 12, COMPILE_WORD, BRANCH, 4, INTERPRET_WORD
+        dd BRANCH, -40
 
 dictentry EMIT, "EMIT"
         push ebx

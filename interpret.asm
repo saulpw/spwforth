@@ -140,8 +140,10 @@ found:
         pop edi
         pop esi
 
-        add edx, 16       ; get xt from nt
-        push edx
+        mov cl, byte [edx+4]     ; immediate flag (0x80)
+        mov ebx, -1
+        test cl, 0x80
+        jz notimmed
         mov ebx, 1
 notimmed:
         lea edx, [edx+eax+6]     ; get xt from header (6=link+namelen+NUL+flags)
