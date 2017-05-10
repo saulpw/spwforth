@@ -53,27 +53,36 @@ dictentry _WORD, "WORD"
 
 nextchar:
         lodsb
-        cmp al, bl
-        jz gotspace
         or al, al
-        jz gotzero
+        jz endbuffer
+
+        cmp bl, 32     ; check for whitespace specially
+        jnz cmpchar
+
+wspace: cmp al, 32
+        jbe gotchar
+
+        ; fall-through is unnecessary but fine
+
+cmpchar:
+        cmp al, bl
+        jz gotchar
 
         stosb
         jmp nextchar
 
-gotzero:               ; end of string:
+endbuffer:
         lea eax, [edi-1] ; minus length byte
-        cmp eax, ecx   ; if no characters stored yet
-        jz getline     ; get line of input from user
+        cmp eax, ecx     ; if no characters stored yet
+        jz getline       ; get line of input from user
 
-gotspace:
+gotchar:
         lea eax, [edi-1] ; minus length byte
         cmp eax, ecx   ; if leading spaces only
         jz nextchar    ; just continue
         mov al, 0
         stosb          ; store terminating NUL
 
-        dec esi        ; start next WORD at space/NUL
         mov [TIB], esi
 
         mov edx, edi
@@ -106,7 +115,7 @@ getline:
         or eax, eax    ; 0 bytes read = end of input
         jz BYE
 
-        mov byte [eax+TIBUF-1], 0   ; replace \n with NUL
+        mov dword [eax+TIBUF], 0  ; end buffer with NULs
         mov dword [TIB], TIBUF
         jmp _WORD       ; restart
 
