@@ -95,11 +95,17 @@ getline:
         mov eax, CR
         call ASMEXEC
 
-        push 128
-        push TIBUF
-        push 0   ; stdin
-        call read
-        add esp, 12
+        push ebx
+        mov eax, 0x03  ; sys_read
+        mov ebx, 0     ; stdin
+        mov ecx, TIBUF
+        mov edx, 128
+        int 0x80
+        pop ebx
+
+        or eax, eax    ; 0 bytes read = end of input
+        jz BYE
+
         mov byte [eax+TIBUF-1], 0   ; replace \n with NUL
         mov dword [TIB], TIBUF
         jmp _WORD       ; restart

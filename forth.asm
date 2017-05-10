@@ -11,7 +11,7 @@
 bits 32
 
 global main
-extern strtol, read, snprintf
+extern strtol, snprintf
 
 %define latest_tok 0  ; tail of dictionary linked list
 
