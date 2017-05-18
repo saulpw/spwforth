@@ -61,6 +61,8 @@ main:
         mov edi, available ; edi = HERE
         NEXT
 
+; start of dictionary
+
 ENTER:  RPUSH esi
         pop esi           ; get parameter field address from 'call ENTER'
         NEXT
@@ -132,6 +134,10 @@ dictentry STAR, "*"  ; ( a b -- a*b )
 dictentry PLUS, "+"  ; ( a b -- a+b )
         pop eax
         add ebx, eax
+        NEXT
+
+dictentry INCR, "1+"  ; ( a -- a+1 )
+        inc ebx
         NEXT
 
 dictentry MINUS, "-"  ; ( a b -- a-b )
@@ -243,10 +249,10 @@ wordnotfound:
         mov eax, SPRINTF
         call ASMEXEC
 
-        mov esi, pQUIT  ; QUIT after 'calling' TYPE
+        mov esi, pQUIT     ; QUIT after 'calling' TYPE
         jmp TYPE
 
-dictentry TYPE, "TYPE"
+dictentry TYPE, "TYPE" ; ( ptr n -- )
         mov edx, ebx   ; count
         pop ecx        ; ptr to buf
         mov ebx, 1     ; stdout
@@ -257,16 +263,19 @@ dictentry TYPE, "TYPE"
         NEXT
 
 dictentry SPRINTF, "SPRINTF"  ; ( ?args? nargs fmtstr -- PAD n )
-        pop ecx
-        RPUSH ecx
-        push ebx
+        pop ecx        ; ecx := nargs
+        RPUSH ecx      ; save nargs on return stack
+
+        push ebx       ; fmtstr
         push 128
         push PAD
         call snprintf
         add esp, 12
+
         RPOP ecx
         shl ecx, 2
         add esp, ecx   ; remove args to snprintf
+
         push PAD
         mov ebx, eax
         NEXT
