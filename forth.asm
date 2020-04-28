@@ -30,7 +30,7 @@ extern strtol, snprintf
         add ebp, 4
 %endmacro
 
-; use like: dictentry STAR, "*"
+; internal words, use like: dictentry STAR, "*"
 %macro dictentry 2
 %strlen namelen %2
 nt_%1  dd latest_tok
@@ -41,7 +41,7 @@ name_%1 db %2
 %1:
 %endmacro
 
-; use like: dictentry SEMI, ";", 1
+; internal IMMEDIATE words, use like: dictentry SEMI, ";", 1
 %macro dictentry 3
 %strlen namelen %2
 nt_%1  dd latest_tok
@@ -70,13 +70,13 @@ ENTER:  RPUSH esi
 EXIT:   RPOP esi
         NEXT
 
-DOLITERAL:
+dictentry DOLITERAL, "DOLIT" ; ( -- v )
         lodsd
         push ebx
         mov ebx, eax
         NEXT
 
-EXECUTE:
+dictentry EXECUTE, "EXECUTE" ; ( ?? xt -- ?? )
         pop eax
         xchg eax, ebx
         jmp eax
@@ -87,7 +87,7 @@ dictentry QDUP, "?DUP"    ; ( 0|a -- 0|a a )
         push ebx
 qdupdone: NEXT
 
-dictentry GTZERO, ">0"    ; ( v -- v<0 )
+dictentry GTZERO, "0>"    ; ( v -- v>0 )
         cmp ebx, 0
         jle false
         mov ebx, 1
@@ -95,12 +95,20 @@ dictentry GTZERO, ">0"    ; ( v -- v<0 )
 false:  mov ebx, 0
         NEXT
 
-BRANCH:
+dictentry EQZERO, "0="    ; ( v -- v>0 )
+        or ebx, ebx
+        jnz false2
+        mov ebx, 1
+        NEXT
+false2:  mov ebx, 0
+        NEXT
+
+dictentry BRANCH, "BRANCH"    ; ( -- )
         lodsd
         add esi, eax
         NEXT
 
-QBRANCH:
+dictentry QBRANCH, "?BRANCH"  ; ( b -- )
         lodsd
         cmp ebx, 0
         pop ebx
@@ -311,6 +319,17 @@ dictentry COMMA, ","   ; ( v -- )
         pop ebx
         NEXT
 
+dictentry HERE, "HERE"  ; ( -- ptr )
+        push ebx
+        mov ebx, edi
+        NEXT
+
+dictentry ALLOT, "ALLOT" ; ( n -- )
+        add edi, ebx
+        pop ebx
+        NEXT
+
+
 dictentry IMMEDIATE, "IMMEDIATE"   ; ( -- )
         mov eax, [LATEST]
         or byte [eax+4], 0x80
@@ -334,8 +353,8 @@ dictentry CREATE, "CREATE"   ; ( "<token>" -- )
         stosb
         mov eax, ENTER
         sub eax, edi
-        sub eax, 4             ; (edi-1)+5+eax := ENTER
-        stosd 
+        sub eax, 4             ; [(edi-1)+5+eax] := ENTER
+        stosd
         NEXT
 
 dictentry RBRACKET, "]"   ; ( "<token>" -- )
@@ -354,19 +373,27 @@ dictentry SEMICOLON, ";", 1   ; ( "<token>" -- )
         call ENTER
         dd DOLITERAL, EXIT, COMMA, LBRACKET, EXIT
 
-%include "interpret.asm"
+dictentry BLANK, "BL"
+        call ENTER
+        dd DOLITERAL, 32, EXIT
+
+dictentry COMPILETICK, "[']", 1  ; ( "<token>" -- ) runtime: ( -- xt )
+        call ENTER
+        dd BLANK, _WORD, FIND, EQZERO, QABORT, LITERAL, EXIT
 
 dictentry LITERAL, "LITERAL"
         call ENTER
         dd DOLITERAL, DOLITERAL, COMMA, COMMA, EXIT
 
+%include "interpret.asm"
+
 INTERPRET_WORD: call ENTER
-        dd DOLITERAL, 32, _WORD
+        dd BLANK, _WORD
         dd FIND, QBRANCH, 12
         dd EXECUTE, BRANCH, 4, TONUM, EXIT
 
 COMPILE_WORD: call ENTER
-        dd DOLITERAL, 32, _WORD
+        dd BLANK, _WORD
         dd FIND
         dd QDUP, QBRANCH, 36, GTZERO
         dd QBRANCH, 12, EXECUTE, BRANCH, 4, COMMA
@@ -433,10 +460,14 @@ dictentry ABORT, "ABORT"
         dd SP_CLEAR
 pQUIT   dd QUIT
 
+dictentry QABORT, "?ABORT"
+        call ENTER
+        dd QBRANCH, 4, ABORT, EXIT
+
 pABORT  dd ABORT
 
 section .data
-TIBUF   times 128 db 0
+TIBUF   times 132 db 0
 TIB     dd 0
 PAD     times 128 db 0
 LATEST  dd latest_tok

@@ -1,5 +1,21 @@
 : ( 41 WORD DROP ; IMMEDIATE
 
-( comments now work )
+: '   BL WORD FIND 0= ?ABORT ;
+: [']  '  LITERAL ; IMMEDIATE
+: POSTPONE  ' LITERAL ['] , , ; IMMEDIATE
 
-2 2 + .
+: OFFSET  ( jumpoffptr target -- jumpoffset ) - 1 CELLS / 1 - ;
+
+: >MARK     ( -- ptr ) HERE  0 , ;
+: >RESOLVE  ( ptr -- ) HERE OVER OFFSET SWAP ! ;
+: <MARK     ( -- ptr ) HERE ;
+: <RESOLVE  ( ptr -- ) HERE OFFSET , ;
+
+: BEGIN  <MARK ; IMMEDIATE
+: AGAIN  POSTPONE BRANCH   <RESOLVE ; IMMEDIATE
+: UNTIL  POSTPONE QBRANCH  <RESOLVE ; IMMEDIATE
+
+: IF    POSTPONE QBRANCH >MARK ; IMMEDIATE
+: ELSE  POSTPONE BRANCH  >MARK SWAP >RESOLVE ; IMMEDIATE
+: THEN  >RESOLVE ; IMMEDIATE
+
