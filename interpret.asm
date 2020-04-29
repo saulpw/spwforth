@@ -108,7 +108,7 @@ getline:
         mov eax, 0x03  ; sys_read
         mov ebx, 0     ; stdin
         mov ecx, TIBUF
-        mov edx, 128
+        mov edx, INPUTLEN
         int 0x80
         pop ebx
 

@@ -10,6 +10,8 @@
 
 bits 32
 
+%define INPUTLEN 4096  ; maximum input size
+
 global main
 extern strtol, snprintf
 
@@ -249,7 +251,7 @@ dictentry TONUM, ">NUMBER"
         mov ebx, eax       ; ebx := return value
         NEXT
 
-nffmt   db "word not found: %s", 13, 10, 0
+nffmt   db "word not found: '%s'", 13, 10, 0
 wordnotfound:
         push ebx
         push 1
@@ -467,7 +469,7 @@ dictentry QABORT, "?ABORT"
 pABORT  dd ABORT
 
 section .data
-TIBUF   times 132 db 0
+TIBUF   times INPUTLEN+4 db 0
 TIB     dd 0
 PAD     times 128 db 0
 LATEST  dd latest_tok
