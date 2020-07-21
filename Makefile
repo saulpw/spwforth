@@ -2,7 +2,7 @@
 all: spwforth
 
 test: spwforth core.4th
-	cat core.4th | ./spwforth
+	cat core.4th tests.4th | ./spwforth
 
 spwforth: forth.o
 	gcc -g -m32 $^ -o $@ -lc -lm

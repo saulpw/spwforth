@@ -47,6 +47,7 @@ dictentry _WORD, "WORD"
         mov ecx, edi   ; ecx := saved HERE
         inc edi        ; reserve one char for length
 
+resume:
         mov esi, [TIB]
         or esi, esi    ; if no source for input buffer
         jz getline
@@ -54,7 +55,7 @@ dictentry _WORD, "WORD"
 nextchar:
         lodsb
         or al, al
-        jz endbuffer
+        jz getline
 
         cmp bl, 32     ; check for whitespace specially
         jnz cmpchar
@@ -98,26 +99,30 @@ gotchar:
 
 ; should become REFILL ( -- flag ) at some point
 getline:
-        mov edi, ecx   ; restore saved HERE
         pop esi
+        push ecx       ; save saved-HERE
 
-        mov eax, CR
-        call ASMEXEC
-
+        push eax
         push ebx
         mov eax, 0x03  ; sys_read
         mov ebx, 0     ; stdin
         mov ecx, TIBUF
         mov edx, INPUTLEN
         int 0x80
-        pop ebx
 
         or eax, eax    ; 0 bytes read = end of input
-        jz BYE
+        jz endbuffer
 
         mov dword [eax+TIBUF], 0  ; end buffer with NULs
         mov dword [TIB], TIBUF
-        jmp _WORD       ; restart
+
+        pop eax
+        pop ebx
+
+        pop ecx
+        push esi
+        jmp resume
+
 
 dictentry FIND, "FIND"  ; ( tok -- tok|xt 0|1|-1 )
         push esi

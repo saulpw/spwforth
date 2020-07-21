@@ -4,8 +4,9 @@
 : [']  '  LITERAL ; IMMEDIATE
 : POSTPONE  ' LITERAL ['] , , ; IMMEDIATE
 
-: OFFSET  ( jumpoffptr target -- jumpoffset ) - 1 CELLS / 1 - ;
+: CELLS ( n -- bytes ) 4 * ;
 
+: OFFSET  ( jumpoffptr target -- jumpoffset ) - 1 CELLS / 1 - ;
 : >MARK     ( -- ptr ) HERE  0 , ;
 : >RESOLVE  ( ptr -- ) HERE OVER OFFSET SWAP ! ;
 : <MARK     ( -- ptr ) HERE ;
